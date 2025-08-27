@@ -1,181 +1,68 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Chart Service</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.0.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@3.0.0"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-        }
-        .chart-container {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        canvas {
-            max-width: 100%;
-            height: auto;
-        }
-        .loading {
-            text-align: center;
-            color: #666;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matrix Chart</title>
+  <!-- Chart.js v4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3"></script>
+  <!-- chartjs-chart-matrix v3 -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@3.0.0"></script>
+  <style>
+    body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; }
+    #wrap { max-width: 900px; margin: 0 auto; }
+    canvas { width: 100%; height: 500px; }
+  </style>
 </head>
 <body>
-    <div class="chart-container">
-        <div id="loading" class="loading">Lade Matrix-Chart...</div>
-        <canvas id="matrixChart" style="display:none;"></canvas>
-    </div>
+  <div id="wrap">
+    <h1>Matrix</h1>
+    <canvas id="matrix"></canvas>
+  </div>
 
-    <script>
-        function createMatrixChart(data, options = {}) {
-            const ctx = document.getElementById('matrixChart').getContext('2d');
-            
-            // Standard-Optionen für Matrix-Chart
-            const defaultOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: 'linear',
-                        position: 'bottom',
-                        title: {
-                            display: true,
-                            text: options.xAxisTitle || 'X-Achse'
-                        }
-                    },
-                    y: {
-                        type: 'linear',
-                        title: {
-                            display: true,
-                            text: options.yAxisTitle || 'Y-Achse'
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: options.title || 'Matrix Chart'
-                    },
-                    legend: {
-                        display: options.showLegend !== false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            title: function(context) {
-                                return `Position: (${context[0].parsed.x}, ${context[0].parsed.y})`;
-                            },
-                            label: function(context) {
-                                return `Wert: ${context.parsed.v}`;
-                            }
-                        }
-                    }
-                }
-            };
+  <script>
+    // 1) Beispiel-Daten (später durch Fetch ersetzen)
+    const raw = [
+      {x:1, y:1, v:10}, {x:2, y:1, v:20}, {x:3, y:1, v:15},
+      {x:1, y:2, v:5},  {x:2, y:2, v:30}, {x:3, y:2, v:12},
+      {x:1, y:3, v:18}, {x:2, y:3, v:8},  {x:3, y:3, v:22}
+    ];
 
-            const chart = new Chart(ctx, {
-                type: 'matrix',
-                data: {
-                    datasets: [{
-                        label: options.datasetLabel || 'Matrix Data',
-                        data: data,
-                        backgroundColor: function(ctx) {
-                            if (!ctx.parsed) return 'rgba(54, 162, 235, 0.2)';
-                            
-                            const value = ctx.parsed.v;
-                            const maxValue = Math.max(...data.map(d => d.v));
-                            const minValue = Math.min(...data.map(d => d.v));
-                            
-                            // Normalisierung zwischen 0 und 1
-                            const normalized = (value - minValue) / (maxValue - minValue);
-                            
-                            // Farbverlauf von blau zu rot
-                            const red = Math.floor(normalized * 255);
-                            const blue = Math.floor((1 - normalized) * 255);
-                            
-                            return `rgba(${red}, 50, ${blue}, 0.8)`;
-                        },
-                        borderColor: options.borderColor || 'rgba(0,0,0,0.1)',
-                        borderWidth: options.borderWidth || 1,
-                        width: function({chart}) {
-                            const area = chart.chartArea || {};
-                            const xRange = Math.max(...data.map(d => d.x)) - Math.min(...data.map(d => d.x)) + 1;
-                            return (area.width || 400) / xRange - 2;
-                        },
-                        height: function({chart}) {
-                            const area = chart.chartArea || {};
-                            const yRange = Math.max(...data.map(d => d.y)) - Math.min(...data.map(d => d.y)) + 1;
-                            return (area.height || 400) / yRange - 2;
-                        }
-                    }]
-                },
-                options: { ...defaultOptions, ...options.chartOptions }
-            });
+    // 2) einfache Farbskala (0..30)
+    function colorFor(v) {
+      const t = Math.max(0, Math.min(1, v / 30));   // 0..1
+      const c = Math.round(255 * t);                 // 0..255
+      return `rgba(${c}, 50, ${255-c}, 0.85)`;
+    }
 
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('matrixChart').style.display = 'block';
-            
-            return chart;
+    // 3) Chart-Konfig
+    const cfg = {
+      type: 'matrix',
+      data: {
+        datasets: [{
+          label: 'Heatmap',
+          data: raw,
+          backgroundColor: ctx => colorFor(ctx.raw.v),
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.2)',
+          width:  ctx => (ctx.chart.chartArea.width  / 3) - 6,
+          height: ctx => (ctx.chart.chartArea.height / 3) - 6,
+        }]
+      },
+      options: {
+        animation: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          title: (items) => `x=${items[0].raw.x}, y=${items[0].raw.y}`,
+          label: (item) => `Wert: ${item.raw.v}`
+        }}},
+        scales: {
+          x: { type: 'linear', min: 0.5, max: 3.5, ticks: { stepSize: 1 } },
+          y: { type: 'linear', min: 0.5, max: 3.5, ticks: { stepSize: 1 }, reverse: true }
         }
+      }
+    };
 
-        // API für n8n - Daten über URL-Parameter oder POST empfangen
-        function initializeFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            
-            if (urlParams.has('data')) {
-                try {
-                    const data = JSON.parse(decodeURIComponent(urlParams.get('data')));
-                    const options = urlParams.has('options') ? 
-                        JSON.parse(decodeURIComponent(urlParams.get('options'))) : {};
-                    
-                    createMatrixChart(data, options);
-                } catch (error) {
-                    console.error('Fehler beim Parsen der URL-Parameter:', error);
-                    showSampleChart();
-                }
-            } else {
-                showSampleChart();
-            }
-        }
-
-        // Beispiel-Chart anzeigen
-        function showSampleChart() {
-            const sampleData = [
-                {x: 0, y: 0, v: 10}, {x: 1, y: 0, v: 20}, {x: 2, y: 0, v: 15},
-                {x: 0, y: 1, v: 25}, {x: 1, y: 1, v: 30}, {x: 2, y: 1, v: 18},
-                {x: 0, y: 2, v: 12}, {x: 1, y: 2, v: 22}, {x: 2, y: 2, v: 28},
-                {x: 0, y: 3, v: 8},  {x: 1, y: 3, v: 35}, {x: 2, y: 3, v: 32}
-            ];
-            
-            const sampleOptions = {
-                title: 'Beispiel Matrix Chart',
-                xAxisTitle: 'Kategorie',
-                yAxisTitle: 'Zeit',
-                datasetLabel: 'Beispieldaten'
-            };
-            
-            createMatrixChart(sampleData, sampleOptions);
-        }
-
-        // POST-API für n8n HTTP Request
-        window.addEventListener('message', function(event) {
-            if (event.data && event.data.type === 'CREATE_MATRIX_CHART') {
-                createMatrixChart(event.data.data, event.data.options);
-            }
-        });
-
-        // Chart initialisieren
-        initializeFromURL();
-    </script>
+    new Chart(document.getElementById('matrix'), cfg);
+  </script>
 </body>
 </html>
